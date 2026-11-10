@@ -1920,7 +1920,20 @@ const CH_COVER={'MC-7200':{min:24,max:84},'MC-4500':{min:24,max:84},'MC-3500':{m
 // Bedding and cover in ft; null means use the product's spec default
 const GEO={lv:0.40,cv:0.40,lb:null,lc:null,cb:null,cc:null,ct:'perforated',lg:null,le:null,cg:null,ce:null,ow:0,sl:0,uc:0};
 // Spacing between rows / barrels and excavation beyond the product, per manufacturer details (inches)
+// Cast-in-place concrete pipe (CIPCP), slip-formed in the trench (MAG Section 620 as amended by the City of Mesa; ACI 346).
+// Trench has vertical sides and a semicircular bottom; the pipe is cast against undisturbed soil for at least the bottom 210°.
+// Wall = ID/12 + 1″ (ID over 24″), 2½″ for 15–24″. No stone: storage is the pipe volume only. Final backfill waits for 3,000 psi.
+// Assumed, to confirm against the MAG detail sheets: 36″ minimum cover (ACI 346 check below 3 ft), clear soil between parallel trenches of ½ OD (3 ft min),
+// 325 lf/day per slipform spread (84″ storm drain, 300–350 ft/day, Munn 1989), 72 h to the 3,000 psi Mesa 620 requires before final backfill, runs up to 1,600 ft (practical limit, not a spec value).
+const CIP_SIZES=[36,42,48,54,60,66,72,78,84,90,96,102,108,114,120];
+const isCIP=m=>/^CIPCP \d+/.test(m||'');
+const cipD=m=>parseInt(String(m).slice(6),10);
+const cipWall=D=>D<=24?2.5:D/12+1;
+const cipOD=D=>(D+2*cipWall(D))/12;
+const cipModel=D=>`CIPCP ${D}″`;
+const CIP_RATE=325/8, CIP_CURE=72, CIP_MAXRUN=1600;
 function spacingSpec(model){
+  if(isCIP(model)){ const OD=cipOD(cipD(model)); return {gap:Math.max(36,Math.round(OD*12/2)),fixed:false,gapNote:'Undisturbed soil between trenches; ½ OD (3 ft min) assumed',side:0,sideSrc:'Cast against vertical trench walls: no side excavation (MAG 620)'}; }
   if(model==='AquaBox') return {gap:0,fixed:true,gapNote:'Modules interlock, no spacing',side:12,sideSrc:'ADS cross section: 12″ min'};
   if(isMV(model)) return {gap:0,fixed:true,gapNote:'Modules clip together, no spacing',side:12,sideSrc:'Assumed 12″ (Greenrise publishes no side detail)'};
   if(RTANK[model]) return {gap:0,fixed:true,gapNote:'Modules butt together (gaps under ½″ allowed)',side:24,sideSrc:'R-Tank install guide: 2 ft perimeter'};
@@ -1946,6 +1959,7 @@ function applyOverdig(b){
 // Contech CMP wall: perforated and Xfiltration-joint pipe connect to the stone, so stone voids count as storage; solid pipe counts pipe volume only.
 const CMP_TYPES={perforated:{name:'Perforated',stone:true},xfiltration:{name:'Xfiltration',stone:true},solid:{name:'Solid',stone:false}};
 function leftSpec(model){ // inches
+  if(isCIP(model)) return {bed:0,cov:36,minBed:0,minCov:24,maxCov:null,stoneAbove:0,src:'MAG 620 / ACI 346'};
   if(model==='AquaBox') return {bed:6,cov:18,minBed:6,minCov:18,maxCov:78,stoneAbove:6,src:'ADS'};
   if(model==='SingleTrap'||model==='DoubleTrap') return {bed:6,cov:6,minBed:6,minCov:6,maxCov:null,stoneAbove:0,src:'StormTrap'};
   if(isMV(model)) return {bed:6,cov:RTANK[model].minCov,minBed:4,minCov:RTANK[model].minCov,maxCov:null,stoneAbove:0,src:'Greenrise'};
@@ -2166,7 +2180,21 @@ function fitCM(L,Wd,D,Dia){
   }
   return best;
 }
+function cipRunsRect(B,L,model){ const OD=cipOD(cipD(model)), s=LG(model), runs=[]; for(let i=0;i<B;i++) runs.push({row:i,x:i*(OD+s),z0:0,C:L,used:L}); return runs; }
+function layoutCIP(req,model){ const D=cipD(model), A=Math.PI*(D/24)**2, OD=cipOD(D), s=LG(model), sp=famSpec('cip',{model},{}), c=[];
+  for(let B=1;B<=80;B++){ const L=Math.ceil(req/(B*A)); if(L>CIP_MAXRUN) continue; if(L<20&&B>1) break;
+    c.push(shapeBed('cip',{model},{},sp,cipRunsRect(B,L,model),[[0,0,B*OD+(B-1)*s,L]],0)); }
+  if(!c.length) return null;
+  const prac=c.filter(b=>Math.max(b.bedL/b.bedW,b.bedW/b.bedL)<=4), pool=prac.length?prac:c, minA=Math.min(...pool.map(b=>b.area));
+  const ok=pool.filter(b=>b.area<=minA*1.04); ok.sort((a,b)=>Math.abs(a.bedL/a.bedW-2.8)-Math.abs(b.bedL/b.bedW-2.8)); return ok[0]; }
+function fitCIP(L,W,model){ const D=cipD(model), OD=cipOD(D), s=LG(model), sp=famSpec('cip',{model},{}); let best=null;
+  for(const [a,b] of [[W,L],[L,W]]){ const B=Math.floor((a+s)/(OD+s)+1e-9), run=Math.min(Math.floor(b),CIP_MAXRUN); if(B<1||run<1) continue;
+    const bed=shapeBed('cip',{model},{},sp,cipRunsRect(B,run,model),[[0,0,a,b]],0); if(!best||bed.storage>best.storage) best=bed; }
+  return best; }
+function cipAssume(k,b){ const D=cipD(k), t=cipWall(D), OD=cipOD(D);
+  return `Cast-in-place ${D}″ pipe: ${t.toFixed(1)}″ wall (ID/12 + 1″, MAG/Mesa Section 620), ${(OD*12).toFixed(1)}″ OD, ${(Math.PI*(D/24)**2).toFixed(1)} cf per lf. Slip-formed against a vertical-sided trench with a semicircular bottom, so there is no stone, no bedding and no side excavation; storage is the pipe only. Excavation is the trenches alone (the soil between parallel runs stays). Assumed: ${Math.round(LC(k)*12)}″ cover (not set by Section 620; confirm per plans), ${Math.round(LG(k)*12)}″ of undisturbed soil between trenches, ${Math.round(CIP_RATE*8)} lf per day per slipform spread, ${CIP_CURE} h to the 3,000 psi Mesa 620 requires before final backfill (TRB field data: backfill usually starts after 2–3 days), runs no longer than ${CIP_MAXRUN.toLocaleString()} ft (practical limit; Section 620 sets none). Confirm against the MAG detail sheets and the contractor's layout.`; }
 function leftLayout(p){
+  if(isCIP(p.model)) return p.mode==='footprint'?(p.shape?fitShape('cip',p,{}):fitCIP(p.fpL,p.fpW,p.model)):layoutCIP(p.req,p.model);
   if(p.mode==='footprint'&&p.shape) return isRT(p.model)?fitShape('rt',p,{n:p.rtN||rtAutoN(p.model,p.depth)||1}):isBox(p.model)?fitShape('aqua',p,{N:p.layers||aquaAutoLayers(p.depth)}):isTrap(p.model)?fitShape('trap',p,{H:p.trapH||trapAutoH(p.model,p.depth)}):fitShape('chamber',p,{});
   if(isRT(p.model)){ const n=p.rtN||rtAutoN(p.model,p.depth)||1;
     return p.mode==='footprint'?fitRT(p.fpL,p.fpW,p.depth,p.model,n):layoutRT(p.req,p.depth,p.model,n); }
@@ -2185,7 +2213,7 @@ function layouts(p){
 const layoutKey=p=>shapeSig(p.mode==='footprint'?p.shape:null)+'|'+p.model+'|'+(isTrap(p.model)?(p.trapH||'auto'):'')+(isBox(p.model)?(p.layers||'auto'):'')+(isRT(p.model)?(p.rtN||'auto'):'')+'|'+[p.lv,p.cv,p.lb,p.lc,p.cb,p.cc,p.lg,p.le,p.cg,p.ce,p.ow,p.sl,p.uc].join(',')+'|'+p.dia+(p.cmpType||'perforated')+(p.mode==='footprint'?`f${p.fpL}x${p.fpW}@${p.depth}`:`s${Math.round(p.req)}@${p.depth}`);
 const storageBasis=S=>params.mode==='footprint'?S.storage:params.req;
 function sched(S,installDur){
-  S.t1=S.exc/RATE.exc; S.t2=S.t1+S.baseStone/RATE.stone; S.t3=S.t2+installDur; S.t4=S.t3+((S.stone-S.baseStone)+(S.backfill||0))/RATE.stone;
+  S.t1=S.exc/RATE.exc; S.t2=S.t1+S.baseStone/RATE.stone; S.t3=S.t2+installDur; S.t4=S.t3+(S.cure||0)+((S.stone-S.baseStone)+(S.backfill||0))/RATE.stone;
 }
 
 /* ================= CUSTOM FOOTPRINT SHAPES ================= */
@@ -2259,6 +2287,7 @@ function famSpec(fam,p,ex){
   if(fam==='chamber'){ const m=CHAMBERS[p.model]; return {lat:m.W/12,gap:LG(p.model),edge:LE(p.model),unitL:m.L/12,endL:m.cap/12,ag:0}; }
   if(fam==='rt'){ const t=RTANK[p.model]; return {lat:t.pw/12,gap:0,edge:LE(p.model),unitL:t.pl/12,endL:0,ag:0}; }
   if(fam==='aqua') return {lat:AQUA.cell,gap:0,edge:LE('AquaBox'),unitL:AQUA.cell,endL:0,ag:0};
+  if(fam==='cip'){ const D=cipD(p.model); return {lat:cipOD(D),gap:LG(p.model),edge:0,unitL:1,endL:0,ag:0,soilGap:true}; }
   if(fam==='trap') return {lat:TRAP_W,gap:TRAP_GAP,edge:LE(p.model),unitL:TRAP_L,endL:0,ag:TRAP_GAP};
   return {lat:ex.Dia/12,gap:CG(ex.Dia),edge:CE(),unitL:20,endL:0,ag:0};
 }
@@ -2284,7 +2313,7 @@ function shapeBed(fam,p,ex,sp,runs,rects,o){
   Object.keys(byRow).forEach(k=>{ const nxt=byRow[+k+1]; if(!nxt) return; byRow[k].forEach(a=>nxt.forEach(b=>{
     const lo=Math.max(a.z0,b.z0), hi=Math.min(a.z0+a.used,b.z0+b.used);
     if(hi+e>lo-e) rr.push([a.x+sp.lat,lo-e,b.x,hi+e]);
-    if(hi>lo&&sp.gap>0) ur.push([a.x+sp.lat,lo,b.x,hi]); })); });
+    if(hi>lo&&sp.gap>0&&!sp.soilGap) ur.push([a.x+sp.lat,lo,b.x,hi]); })); });
   const reg=regionOf(rr,rects), prod=regionOf(ur), shp=regionOf(rects), [bx0,bz0,bx1,bz1]=reg.bbox;
   const loc=r=>[r[0]-bx0,r[1]-bz0,r[2]-bx0,r[3]-bz0], locS=s=>[s[0]-bx0,s[1]-bz0,s[2]-bx0,s[3]-bz0,s[4]];
   const n=runs.reduce((a,r)=>a+r.C,0), rows=Object.keys(byRow).length, maxC=Math.max(...runs.map(r=>r.C));
@@ -2314,6 +2343,15 @@ function shapeBed(fam,p,ex,sp,runs,rects,o){
     b.n=n; b.pieces=n*t.pieces; b.h=t.slabs*TRAP_SLAB+H; b.sysH=b.base+b.h; b.cover=0; b.cov=LC(p.model); b.excD=b.sysH+b.cov;
     b.baseStone=b.area*b.base; b.stone=b.baseStone; b.backfill=(b.area-n*TRAP_W*TRAP_L)*b.h; b.perMod=TRAP_EFF*TRAP_W*TRAP_L*H; b.storage=n*b.perMod; b.prodVol=b.storage;
     b.rate=t.setRate/t.pieces; b.cyc=1/b.rate; b.dur=0.8/b.rate; }
+  else if(fam==='cip'){ const D=cipD(p.model), t=cipWall(D), OD=cipOD(D), Ro=OD/2;
+    b={kind:'cip',model:p.model,brand:'',unit:'lf',spec:{crew:0,pal:1e9,capW:OD*12},dia:D,wallIn:t,w:OD,len:1,gap:sp.gap,edge:0,cap:0,base:0,cover:0,h:OD,...g};
+    b.region={rects:prod.rects.map(loc),holes:prod.holes.map(loc),segs:prod.segs.map(locS)};
+    b.n=n; b.lf=n; b.pieces=n; b.sysH=OD; b.cov=LC(p.model); b.excD=OD+b.cov;
+    b.prodVol=n*Math.PI*(D/24)**2; b.storage=b.prodVol; b.stone=0; b.baseStone=0; b.void=0; b.digArea=prod.area;
+    b.backfill=n*(OD*Ro-Math.PI*Ro*Ro/2); b.cure=CIP_CURE; b.rate=CIP_RATE; b.cyc=1/CIP_RATE; b.dur=1/CIP_RATE;
+    const tmp={area:prod.area,perim:prod.per,bedW:b.bedW,bedL:b.bedL,excD:b.excD,stone:0,baseStone:0}; applyOverdig(tmp);
+    Object.assign(b,{digD:tmp.digD,topW:tmp.topW,topL:tmp.topL,topArea:tmp.topArea,ucStone:tmp.ucStone,stone:tmp.ucStone,baseStone:tmp.ucStone});
+    b.exc=tmp.exc-n*(2-Math.PI/2)*Ro*Ro; b.overExc=tmp.exc-prod.area*b.excD; return b; }
   else { const Dia=ex.Dia, d=Dia/12;
     b={dia:Dia,d,gap:CG(Dia),edge:e,base:CB(),stick:20,unit:'sticks',...g,B:rows,S:maxC};
     b.n=n; b.runL=Math.max(...runs.map(r=>r.used)); b.sysH=b.base+d; b.cov=CC(Dia); b.excD=b.base+d+b.cov;
@@ -2343,7 +2381,7 @@ function drawPlans(v,ch,cm){
 // Quantity rules follow each manufacturer's install guide where it gives one; counts the guides leave to the plans are assumptions (noted).
 // Every unit price is a budget placeholder to replace with a quote.
 const ACC_LAP=1.10;
-const famOf=S=>S.kind==='chamber'?'st':S.kind==='box'?'crate':S.kind==='trap'?'trap':'cmp';
+const famOf=S=>S.kind==='cip'?'cip':S.kind==='chamber'?'st':S.kind==='box'?'crate':S.kind==='trap'?'trap':'cmp';
 const trapBlk=S=>({w:S.R*S.w+(S.R-1)*S.gap, l:S.C*S.len+(S.C-1)*S.gap});
 const perimB=S=>S.perim!=null?S.perim:2*(S.bedW+S.bedL);
 const envA=S=>(2*S.area+perimB(S)*S.sysH)*ACC_LAP, linA=S=>(S.area+perimB(S)*S.sysH)*ACC_LAP;
@@ -2377,6 +2415,13 @@ const ACC={
     {id:'trRis',name:'Access openings with riser & cover',unit:'ea',price:2500,src:'StormTrap guide: 600–1,050 mm openings at either end; 2 + 1 per 5,000 sf assumed',qty:S=>2+Math.floor(blkA(S)/5000)},
     {id:'trCon',name:'Pipe connections (epoxy butt joint)',unit:'ea',price:400,src:'StormTrap guide: epoxy butt joint where penetrations match the pipe ID',qty:()=>2}
   ],
+  cip:[
+    {id:'cpMH',name:'Access manholes on the pipe (48″ precast)',unit:'ea',price:6500,src:'Cut in while the concrete is green; 2 + 1 per 2 runs assumed, confirm per plans',qty:S=>Math.max(2,Math.ceil(S.nRuns/2)+1)},
+    {id:'cpEnd',name:'Cast-in-place end bulkheads',unit:'ea',price:S=>Math.round(35*Math.PI*(S.w/2)**2),src:'Each run end formed and cast; 2 per run assumed',qty:S=>2*S.nRuns},
+    {id:'cpHdr',name:'Junction structures to the header',unit:'ea',price:4500,src:'Runs are separate trenches, so each one needs a cast junction to the header; 1 per run assumed',qty:S=>S.nRuns>1?S.nRuns:0},
+    {id:'cpJt',name:'Construction joints (No. 4 dowels & collar)',unit:'ea',price:450,src:'MAG/Mesa 620: a joint wherever placement stops for over 60 min, with 24″ No. 4 dowels and a concrete collar; 1 per day at 325 lf/day assumed',qty:S=>Math.ceil(S.n/325)},
+    {id:'cpQA',off:1,name:'Wall-thickness probes & cores',unit:'ea',price:150,src:'Mesa 620: wall probed at top, bottom and sides about every 100 ft daily, cores after 14 days; usually owner inspection',qty:S=>Math.ceil(S.n/100)}
+  ],
   cmp:[
     {id:'cmGeo',perf:1,name:'Non-woven geotextile around the stone',unit:'sf',price:0.30,src:'Contech details: C-40/C-45 non-woven wraps the trench for perforated systems (+10% laps)',qty:S=>envA(S)},
     {id:'cmRis',name:'Access risers (36″, slab & HS-25 casting)',unit:'ea',price:3500,src:'Contech guides: 24–48″ risers with a protection slab; no spacing given, 2 + 1 per 2 runs assumed',qty:S=>Math.max(2,Math.ceil(runList(S).length/2)+1)},
@@ -2388,9 +2433,9 @@ const ACC={
   ]
 };
 const ACC_COMMON=[
-  {id:'coOut',common:'outlet',fams:['st','crate','trap'],name:'Outlet control structure (concrete)',unit:'ea',price:8000,src:'Common item (budget)',qty:()=>1},
+  {id:'coOut',common:'outlet',fams:['st','crate','trap','cip'],name:'Outlet control structure (concrete)',unit:'ea',price:8000,src:'Common item (budget)',qty:()=>1},
   {id:'coWeir',common:'outlet',fams:['cmp'],name:'Outlet control: internal weir plate & stub',unit:'ea',price:2500,src:'Contech design guide: internal weir plates and outlet stubs can often replace a concrete outlet structure',qty:()=>1},
-  {id:'coPre',common:'pre',fams:['crate','trap','cmp'],name:'Pretreatment unit (hydrodynamic separator)',unit:'ea',price:18000,src:'Common item (budget). StormTech uses its Isolator Row instead',qty:()=>1}
+  {id:'coPre',common:'pre',fams:['crate','trap','cmp','cip'],name:'Pretreatment unit (hydrodynamic separator)',unit:'ea',price:18000,src:'Common item (budget). StormTech uses its Isolator Row instead',qty:()=>1}
 ];
 const ACCST={use:'inf',iso:1,outlet:false,pre:false,ch:{},cmp:{}};
 function accRows(S,side){
@@ -2441,7 +2486,7 @@ controls.listenToKeyEvents(window);
 
 /* ================= WORLD (rebuilt when storage changes) ================= */
 function buildWorld(CH,CM,DEPTH){
-  const TRAP=CH.kind==='trap', BOX=CH.kind==='box';
+  const TRAP=CH.kind==='trap', BOX=CH.kind==='box', CIP=CH.kind==='cip';
   sched(CH,TRAP?(CH.n-1)/CH.rate+CH.dur:(CH.n-1)/CH.rate+CH.dur);
   sched(CM,(CM.n-1)*CM_T+0.8*CM_T);
   const T_END=Math.max(CH.t4,CM.t4)+1;
@@ -2560,7 +2605,7 @@ function buildWorld(CH,CM,DEPTH){
     Rg.holes.forEach(h=>groundPatch(p.x0+h[0],p.z0+h[1],p.x0+h[2],p.z0+h[3]));
     const parts=Rg.rects.map(r=>{ const q={x0:p.x0+r[0],z0:p.z0+r[1],x1:p.x0+r[2],z1:p.z0+r[3]}, w=q.x1-q.x0, l=q.z1-q.z0;
       const f=new THREE.Mesh(new THREE.PlaneGeometry(w,l),floorMat); f.rotation.x=-Math.PI/2; f.position.set((q.x0+q.x1)/2,-D+0.01,(q.z0+q.z1)/2); f.receiveShadow=true; scene.add(f);
-      q.soil=new THREE.Mesh(unitBox,soilMat); q.base=new THREE.Mesh(unitBox,makeStoneMat(1,Math.max(1,w/16),Math.max(1,l/16))); q.fill=new THREE.Mesh(unitBox,makeStoneMat(0.8,Math.max(1,w/16),Math.max(1,l/16)));
+      q.soil=new THREE.Mesh(unitBox,soilMat); q.base=new THREE.Mesh(unitBox,makeStoneMat(1,Math.max(1,w/16),Math.max(1,l/16))); q.fill=new THREE.Mesh(unitBox,S.kind==='cip'?soilMat:makeStoneMat(0.8,Math.max(1,w/16),Math.max(1,l/16)));
       [q.soil,q.base,q.fill].forEach(m=>{ m.receiveShadow=true; m.visible=false; scene.add(m); }); return q; });
     const dummy=()=>{ const m=new THREE.Mesh(unitBox,soilMat); m.visible=false; scene.add(m); return m; };
     return {p,W,L,cx,cz,soil:dummy(),base:dummy(),fill:dummy(),parts,segs};
@@ -2610,8 +2655,8 @@ function buildWorld(CH,CM,DEPTH){
     g.fillStyle='#2c2f33'; g.fillRect(0,0,64,64); g.fillStyle='#505459';
     for(let i=0;i<4;i++) for(let j=0;j<4;j++){ g.fillRect(i*16+3,j*16+3,10,10); }
     const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; return t; }
-  const chGeo=BOX?(()=>{const g=new THREE.BoxGeometry(CH.w*0.985,CH.layerH*0.99,CH.len*0.985); g.translate(0,CH.layerH/2,0); return g;})():TRAP?trapGeo():corrugate(new THREE.CylinderGeometry(1,1,CH.len*1.055,big?16:36,big?24:40,true,Math.PI/2,Math.PI).rotateX(Math.PI/2),CH.len/8,0.035,CH.w/2,CH.h);
-  const chMat=BOX?new THREE.MeshStandardMaterial({map:boxTex(),roughness:0.7}):TRAP?new THREE.MeshStandardMaterial({color:0xb9b6ae,roughness:0.85}):new THREE.MeshStandardMaterial({color:0x2b2f33,roughness:0.55,metalness:0.05,side:THREE.DoubleSide});
+  const chGeo=CIP?(()=>{ const r=CH.w/2, g=new THREE.CylinderGeometry(r,r,1.04,28,1,false); g.rotateX(Math.PI/2); g.translate(0,r,0); return g; })():BOX?(()=>{const g=new THREE.BoxGeometry(CH.w*0.985,CH.layerH*0.99,CH.len*0.985); g.translate(0,CH.layerH/2,0); return g;})():TRAP?trapGeo():corrugate(new THREE.CylinderGeometry(1,1,CH.len*1.055,big?16:36,big?24:40,true,Math.PI/2,Math.PI).rotateX(Math.PI/2),CH.len/8,0.035,CH.w/2,CH.h);
+  const chMat=CIP?new THREE.MeshStandardMaterial({color:0xc8c3b8,roughness:0.88}):BOX?new THREE.MeshStandardMaterial({map:boxTex(),roughness:0.7}):TRAP?new THREE.MeshStandardMaterial({color:0xb9b6ae,roughness:0.85}):new THREE.MeshStandardMaterial({color:0x2b2f33,roughness:0.55,metalness:0.05,side:THREE.DoubleSide});
   const capShape=new THREE.Shape(); const capHW=CH.spec.capW/24, capH=CH.h*1.0167, capD=CH.cap>1?0.6:0.25;
   capShape.absellipse(0,0,capHW,capH,0,Math.PI,false); capShape.lineTo(capHW,0);
   const capGeo=new THREE.ExtrudeGeometry(capShape,{depth:capD,bevelEnabled:false});
@@ -2634,13 +2679,13 @@ function buildWorld(CH,CM,DEPTH){
     for(let l=0;l<(BOX?CH.layersC:1);l++){ const layer=[];
       CH.runs.forEach((r,k)=>{ for(let c=0;c<r.C;c++){ const z=TRAP?r.z0+c*(CH.len+CH.gap)+CH.len/2:BOX?r.z0+c*CH.len+CH.len/2:r.z0+CH.cap+c*CH.len+CH.len/2;
         const sl={x:PCH.x0+r.x+CH.w/2,z:PCH.z0+z,run:k}; if(BOX){ sl.l=l; sl.sy=(l===CH.layersC-1&&CH.layers%1)?0.5:1; } layer.push(sl); } });
-      layer.sort((a,b)=>a.z-b.z||a.x-b.x); chSlots.push(...layer); } }
+      layer.sort(CIP?((a,b)=>a.run-b.run||a.z-b.z):((a,b)=>a.z-b.z||a.x-b.x)); chSlots.push(...layer); } }
   const chInst=new THREE.InstancedMesh(chGeo,chMat,CH.n);
   chSlots.forEach((s,i)=>{ if(BOX){ tmpM.compose(tmpV.set(s.x,bedTopCh+s.l*CH.layerH,s.z),tmpQ.identity(),tmpS.set(1,s.sy,1)); } else tmpM.makeTranslation(s.x,bedTopCh,s.z); chInst.setMatrixAt(i,tmpM);});
   chInst.count=0; chInst.castShadow=CH.n<=2500; chInst.receiveShadow=true; chInst.frustumCulled=false; scene.add(chInst);
 
   const capInst=new THREE.InstancedMesh(capGeo,capMat,2*(CH.shaped?CH.nRuns:CH.R));
-  capInst.castShadow=true; capInst.frustumCulled=false; scene.add(capInst); capInst.visible=!TRAP;
+  capInst.castShadow=true; capInst.frustumCulled=false; scene.add(capInst); capInst.visible=!TRAP&&!CIP;
   const capBackZ=PCH.z0+CH.edge+CH.cap, capFrontZ=capBackZ+CH.C*CH.len;
   const zero=new THREE.Vector3(0.0001,0.0001,0.0001);
   const capIdx=CH.shaped?CH.runs.map((r,k)=>{ let a=Infinity,b=-1; chSlots.forEach((s,i)=>{ if(s.run===k&&!s.l){ if(i<a) a=i; if(i>b) b=i; } }); return [a,b]; }):null;
@@ -2714,6 +2759,9 @@ function buildWorld(CH,CM,DEPTH){
         if(pitCh.parts) pitCh.parts.forEach(q=>slab(q.x0+0.3,q.z0+0.3,q.x1-0.3,q.z1-0.3)); else { const b=trapBlk(CH), x0=PCH.x0+CH.edge, z0=PCH.z0+CH.edge; slab(x0-1,z0-1,x0+b.w+1,z0+b.l+1); } }
       if(aCh.has('trRis')){ const n=Math.min(12,accQ(CH,'ch','trRis')), half=Math.max(1,Math.ceil(n/2));
         for(let i=0;i<n;i++){ const r=rw[Math.min(rw.length-1,Math.floor((Math.floor(i/2)+0.5)*rw.length/half))]; vPipe(g,r.x+CH.w/2,i%2?r.z0+r.used-CH.len/2:r.z0+CH.len/2,top,GRADE,1.75,concM,true); } }
+    } else if(CH.kind==='cip'){
+      const bG2=new THREE.CircleGeometry(CH.w/2*0.995,36); rw.forEach(r=>[r.z0-0.02,r.z0+r.used+0.02].forEach((z,i)=>{ const m=new THREE.Mesh(bG2,concM); m.position.set(r.x+CH.w/2,bedTopCh+CH.w/2,z); m.rotation.y=i?0:Math.PI; g.add(m); }));
+      if(aCh.has('cpMH')){ const n=Math.min(16,accQ(CH,'ch','cpMH')); for(let i=0;i<n;i++){ const r=rw[Math.round(i*(rw.length-1)/Math.max(1,n-1))], z=i%2?r.z0+r.used-8:r.z0+8; vPipe(g,r.x+CH.w/2,z,bedTopCh+CH.w-0.5,GRADE,2,concM,true); } }
     }
   }
   { // Contech CMP
@@ -2851,7 +2899,7 @@ function buildWorld(CH,CM,DEPTH){
   }
   function buildSigns(){
     signs.forEach(s=>scene.remove(s));
-    signs=[makeSign([(BOX?(CH.rt?CH.model.toUpperCase():'ADS AQUABOX'):TRAP?'STORMTRAP '+CH.model.toUpperCase():CH.model+' CHAMBERS'),(BOX?(CH.rt?'Hand-set · '+CH.pieces+' modules · ':'Hand-built · '+CH.layers+' layers · '):TRAP?'Crane-set · '+CH.n+' modules · ':'Hand-set · '+CH.n+' chambers · ')+Math.round(CH.area).toLocaleString()+' sf'],'#f5c400',(PCH.x0+PCH.x1)/2,PCH.z1+12),
+    signs=[makeSign([(CIP?'CIPCP '+CH.dia+'″ CAST IN PLACE':BOX?(CH.rt?CH.model.toUpperCase():'ADS AQUABOX'):TRAP?'STORMTRAP '+CH.model.toUpperCase():CH.model+' CHAMBERS'),(CIP?'Slip-formed · '+CH.n.toLocaleString()+' lf · ':BOX?(CH.rt?'Hand-set · '+CH.pieces+' modules · ':'Hand-built · '+CH.layers+' layers · '):TRAP?'Crane-set · '+CH.n+' modules · ':'Hand-set · '+CH.n+' chambers · ')+Math.round(CH.area).toLocaleString()+' sf'],'#f5c400',(PCH.x0+PCH.x1)/2,PCH.z1+12),
            makeSign(['CONTECH '+CM.dia+'″ '+CM.wallName.toUpperCase()+' CMP','Crane-set · '+CM.n+' sticks · '+Math.round(CM.area).toLocaleString()+' sf'],'#00467e',(PCM.x0+PCM.x1)/2,PCM.z1+12,true)];
   }
   buildSigns();
@@ -2923,7 +2971,7 @@ function buildWorld(CH,CM,DEPTH){
   const crane=makeCrane(Math.max(130,CM.bedW+80));
   const movingPipe=new THREE.Mesh(pipeGeo,pipeMat); movingPipe.castShadow=true; scene.add(movingPipe);
   const teams=[];
-  for(let k=0;k<(TRAP||BOX?0:K);k++){ const ch=new THREE.Mesh(chGeo,chMat); ch.castShadow=true; scene.add(ch); const ws=[makeWorker(),makeWorker(),makeWorker(),makeWorker()]; ws.forEach((w,j)=>w.visible=j<CH.spec.crew); teams.push({ch,ws}); }
+  for(let k=0;k<(TRAP||BOX||CIP?0:K);k++){ const ch=new THREE.Mesh(chGeo,chMat); ch.castShadow=true; scene.add(ch); const ws=[makeWorker(),makeWorker(),makeWorker(),makeWorker()]; ws.forEach((w,j)=>w.visible=j<CH.spec.crew); teams.push({ch,ws}); }
   const LIFT=Math.min(2.6,CH.h*0.5+0.8);
   const pipeCrew=[makeWorker(),makeWorker(),makeWorker()];
   const signal=makeWorker();
@@ -2931,6 +2979,12 @@ function buildWorld(CH,CM,DEPTH){
     mover:movingPipe,crane,crew:pipeCrew,signal,idleX:PCM.x1+8,idleZ:PCM.z1+22};
   let rigCH=null;
   const boxCrew=BOX?[0,1,2,3,4,5].map(()=>makeWorker()):[];
+  const slipM=new THREE.Group(), mixer=new THREE.Group();
+  if(CIP){ const y=new THREE.Mesh(new THREE.BoxGeometry(CH.w+1,CH.w*0.7+2,8),yellow); y.castShadow=true; slipM.add(y);
+    const hop=new THREE.Mesh(new THREE.BoxGeometry(CH.w*0.6,2.5,3),darkSteel); hop.position.set(0,CH.w*0.35+2,1); slipM.add(hop);
+    const tb=new THREE.Mesh(new THREE.BoxGeometry(8,4,22),new THREE.MeshStandardMaterial({color:0xf4f4f2,roughness:0.6})); tb.position.y=3.5; tb.castShadow=true; mixer.add(tb);
+    const dr=new THREE.Mesh(new THREE.CylinderGeometry(3.2,2.2,10,18),new THREE.MeshStandardMaterial({color:0xd9d9d6,roughness:0.5,metalness:0.3})); dr.rotation.x=Math.PI/2-0.25; dr.position.set(0,8,-3); dr.castShadow=true; mixer.add(dr); }
+  slipM.visible=mixer.visible=false; scene.add(slipM); scene.add(mixer);
   if(TRAP){
     const mv=new THREE.Mesh(chGeo,chMat); mv.castShadow=true; scene.add(mv);
     rigCH={S:CH,T:1/CH.rate,n:CH.n,slots:chSlots,cx:TRAP_CX,side:-1,stageY:0.3,placeY:bedTopCh,top:CH.h,half:CH.w/2,bedY:bedTopCh,liftY:Math.max(30,CH.h+24),
@@ -2938,7 +2992,7 @@ function buildWorld(CH,CM,DEPTH){
   }
 
   /* ---------- per-frame logic ---------- */
-  function phaseFracs(S,t){ return {e:clamp(t/S.t1), b:clamp((t-S.t1)/(S.t2-S.t1)), i:clamp((t-S.t2)/(S.t3-S.t2)), f:clamp((t-S.t3)/(S.t4-S.t3))}; }
+  function phaseFracs(S,t){ return {e:clamp(t/S.t1), b:clamp((t-S.t1)/(S.t2-S.t1)), i:clamp((t-S.t2)/(S.t3-S.t2)), f:clamp((t-S.t3-(S.cure||0))/Math.max(1e-6,S.t4-S.t3-(S.cure||0)))}; }
 
   function chPath(i,u){
     const s=chSlots[i];
@@ -3091,6 +3145,8 @@ function buildWorld(CH,CM,DEPTH){
           if(i>=3){ w.position.set(sl.x+(i-4)*3, 0, PCH.z1+6+i); } w.rotation.y=a; walk(w,playing,clock,i); }
         else { w.position.set(PCH.x0+6+i*3,0,PCH.z1+20); w.rotation.y=Math.PI; walk(w,false,clock,i); }
       }); }
+    else if(CIP){ palletInst.count=0; const working=t>=CH.t2&&t<CH.t3, sl=chSlots[clamp(chStarted,0,CH.n-1)]; slipM.visible=mixer.visible=working;
+      if(working){ slipM.position.set(sl.x,bedTopCh+CH.w*0.35+1,sl.z+4.5); mixer.position.set(sl.x+CH.w/2+8,0,sl.z+8); } }
     else { palletInst.count=Math.ceil((CH.n-chStarted)/PER_PAL); updateTeams(t,clock,playing); }
     const cmPlaced=t<CM.t2?0:clamp(Math.floor((t-CM.t2-0.8*CM_T)/CM_T)+1,0,CM.n);
     cmInst.count=cmPlaced;
@@ -3122,7 +3178,7 @@ function buildWorld(CH,CM,DEPTH){
 let W=null, simT=0, playing=false, speed=4, scrubbing=false, running=false;
 
 function phaseName(S,t,install){
-  if(t<S.t1) return 'Excavating'; if(t<S.t2) return 'Placing base stone'; if(t<S.t3) return install; if(t<S.t4) return S.kind==='trap'?'Perimeter backfill':'Stone backfill'; return 'Complete';
+  if(t<S.t1) return 'Excavating'; if(t<S.t2) return 'Placing base stone'; if(t<S.t3) return install; if(t<S.t4) return S.kind==='cip'?(t<S.t3+S.cure?'Curing to 3,000 psi':'Native backfill'):S.kind==='trap'?'Perimeter backfill':'Stone backfill'; return 'Complete';
 }
 function setTrack(id,S,t){
   const segs=document.querySelectorAll('#'+id+' .seg');
@@ -3160,12 +3216,12 @@ function setLabels(){
   $('matL-ch').textContent=params.chPM==='total'?'Material · total price':'Material @ '+fmtP(params.ch)+'/cf';
   $('matL-cmp').textContent=params.cmpPM==='total'?'Material · total price':'Material @ '+fmtP(params.cmp)+'/cf';
   const CH=W.CH, CM=W.CM;
-  $('chName').textContent=[CH.brand,CH.model].filter(Boolean).join(' ')+(CH.kind==='trap'?' '+fmtFtIn(CH.trapH):CH.rt?' · '+CH.cfgName:CH.kind==='box'?' · '+CH.layers+' layer'+(CH.layers===1?'':'s'):'');
+  $('chName').textContent=[CH.brand,CH.model].filter(Boolean).join(' ')+(CH.kind==='cip'?' cast in place':CH.kind==='trap'?' '+fmtFtIn(CH.trapH):CH.rt?' · '+CH.cfgName:CH.kind==='box'?' · '+CH.layers+' layer'+(CH.layers===1?'':'s'):'');
   document.querySelector('[data-cam="ch"]').textContent=CH.kind==='trap'?'StormTrap':CH.rt?(CH.mv?'MODvault':'R-Tank'):CH.kind==='box'?'AquaBox':'Chambers';
-  $('chEyebrow').textContent=CH.kind==='trap'?'Left crew · set by crane':'Left crew · set by hand';
+  $('chEyebrow').textContent=CH.kind==='cip'?'Left crew · slip-formed in place':CH.kind==='trap'?'Left crew · set by crane':'Left crew · set by hand';
   $('stLbl-ch').textContent=CH.kind==='trap'?'New stone (base only)':'New stone backfill';
   $('cmName').textContent='Contech '+CM.dia+'″ CMP · '+CM.wallName;
-  $('spec-ch').textContent=CH.rt?`${CH.mv?CH.cells.toLocaleString()+' columns × '+CH.cfgName+' = '+CH.pieces.toLocaleString()+' modules · '+CH.hIn.toFixed(1)+'″ tall':CH.cells.toLocaleString()+' modules · '+CH.cfgName+' '+CH.hIn.toFixed(1)+'″ tall'} · ${gridTxt(CH)} · bed ${CH.bedW.toFixed(1)} × ${CH.bedL.toFixed(1)} ft = ${Math.round(CH.area).toLocaleString()} sf`:CH.kind==='box'?`${CH.cells.toLocaleString()} cells × ${CH.layers} layers = ${CH.pieces.toLocaleString()} half modules · bed ${CH.bedW.toFixed(1)} × ${CH.bedL.toFixed(1)} ft = ${Math.round(CH.area).toLocaleString()} sf`:CH.kind==='trap'?`${CH.n} modules${CH.pieces>CH.n?` (${CH.pieces} pieces)`:''} · ${gridTxt(CH)} · ${fmtFtIn(CH.trapH)} inside · bed ${CH.bedW.toFixed(1)} × ${CH.bedL.toFixed(1)} ft = ${Math.round(CH.area).toLocaleString()} sf`:`${CH.n} chambers + ${2*(CH.shaped?CH.nRuns:CH.R)} end caps · ${CH.shaped?CH.nRuns+' runs':CH.R+' rows × '+CH.C} · bed ${CH.bedW.toFixed(1)} × ${CH.bedL.toFixed(1)} ft = ${Math.round(CH.area).toLocaleString()} sf`;
+  $('spec-ch').textContent=CH.kind==='cip'?`${CH.n.toLocaleString()} lf in ${CH.nRuns} run${CH.nRuns>1?'s':''} · ${CH.wallIn.toFixed(1)}″ wall · ${Math.round(CH.bedW)} × ${Math.round(CH.bedL)} ft envelope`:CH.rt?`${CH.mv?CH.cells.toLocaleString()+' columns × '+CH.cfgName+' = '+CH.pieces.toLocaleString()+' modules · '+CH.hIn.toFixed(1)+'″ tall':CH.cells.toLocaleString()+' modules · '+CH.cfgName+' '+CH.hIn.toFixed(1)+'″ tall'} · ${gridTxt(CH)} · bed ${CH.bedW.toFixed(1)} × ${CH.bedL.toFixed(1)} ft = ${Math.round(CH.area).toLocaleString()} sf`:CH.kind==='box'?`${CH.cells.toLocaleString()} cells × ${CH.layers} layers = ${CH.pieces.toLocaleString()} half modules · bed ${CH.bedW.toFixed(1)} × ${CH.bedL.toFixed(1)} ft = ${Math.round(CH.area).toLocaleString()} sf`:CH.kind==='trap'?`${CH.n} modules${CH.pieces>CH.n?` (${CH.pieces} pieces)`:''} · ${gridTxt(CH)} · ${fmtFtIn(CH.trapH)} inside · bed ${CH.bedW.toFixed(1)} × ${CH.bedL.toFixed(1)} ft = ${Math.round(CH.area).toLocaleString()} sf`:`${CH.n} chambers + ${2*(CH.shaped?CH.nRuns:CH.R)} end caps · ${CH.shaped?CH.nRuns+' runs':CH.R+' rows × '+CH.C} · bed ${CH.bedW.toFixed(1)} × ${CH.bedL.toFixed(1)} ft = ${Math.round(CH.area).toLocaleString()} sf`;
   $('spec-cmp').textContent=`${CM.n} sticks · ${CM.shaped?CM.nRuns+' runs, longest '+CM.runL+' ft':CM.B+' barrel'+(CM.B>1?'s':'')+' × '+CM.runL+' ft'} · bed ${+CM.bedW.toFixed(1)} × ${+CM.bedL.toFixed(1)} ft = ${Math.round(CM.area).toLocaleString()} sf (${Math.abs(Math.round((1-CM.area/CH.area)*100))}% ${CM.area<=CH.area?'smaller':'larger'})`;
   $('spec-ch').textContent+=` · ${Math.round(CH.base*12)}″ bedding · ${Math.round(CH.cov*12)}″ cover · dig ${CH.excD.toFixed(2)} ft`;
   $('spec-cmp').textContent+=` · ${Math.round(CM.base*12)}″ bedding · ${Math.round(CM.cov*12)}″ cover · dig ${CM.excD.toFixed(2)} ft`;
@@ -3210,7 +3266,8 @@ function readInputs(){
   else if(isBox(v.model)&&v.layers&&LB('AquaBox')+v.layers*AQUA.layerH+LC('AquaBox')>v.depth+1e-6) err=`${v.layers} AquaBox layers need ${(LB('AquaBox')+v.layers*AQUA.layerH+LC('AquaBox')).toFixed(2)} ft with this bedding and cover. Choose fewer layers or add depth.`;
   else if(isRT(v.model)&&!v.rtN&&rtAutoN(v.model,v.depth)<1) err=`Even a ${rtName(v.model,1)} ${v.model} needs ${(LB(v.model)+rtH(v.model,1)/12+LC(v.model)).toFixed(2)} ft with this bedding and cover. Reduce cover or add depth.`;
   else if(isRT(v.model)&&v.rtN&&LB(v.model)+rtH(v.model,v.rtN)/12+LC(v.model)>v.depth+1e-6) err=`A ${rtName(v.model,v.rtN)} ${v.model} (${rtH(v.model,v.rtN).toFixed(1)}″) needs ${(LB(v.model)+rtH(v.model,v.rtN)/12+LC(v.model)).toFixed(2)} ft with this bedding and cover. Pick a shorter module or add depth.`;
-  else if(!isTrap(v.model)&&!isBox(v.model)&&!isRT(v.model)&&LB(v.model)+CHAMBERS[v.model].H/12+LC(v.model)>v.depth+1e-6) err=`The ${v.model} needs ${(LB(v.model)+CHAMBERS[v.model].H/12+LC(v.model)).toFixed(2)} ft of depth with ${Math.round(LB(v.model)*12)}″ bedding and ${Math.round(LC(v.model)*12)}″ cover. Reduce cover or bedding, or add depth.`;
+  else if(isCIP(v.model)&&cipOD(cipD(v.model))+LC(v.model)>v.depth+1e-6) err=`A ${cipD(v.model)}″ cast-in-place pipe (${cipWall(cipD(v.model)).toFixed(1)}″ wall) needs ${(cipOD(cipD(v.model))+LC(v.model)).toFixed(2)} ft of depth with ${Math.round(LC(v.model)*12)}″ cover. Choose a smaller diameter, reduce cover, or add depth.`;
+  else if(!isCIP(v.model)&&!isTrap(v.model)&&!isBox(v.model)&&!isRT(v.model)&&LB(v.model)+CHAMBERS[v.model].H/12+LC(v.model)>v.depth+1e-6) err=`The ${v.model} needs ${(LB(v.model)+CHAMBERS[v.model].H/12+LC(v.model)).toFixed(2)} ft of depth with ${Math.round(LB(v.model)*12)}″ bedding and ${Math.round(LC(v.model)*12)}″ cover. Reduce cover or bedding, or add depth.`;
   else if(CB()+v.dia/12+CC(v.dia)>v.depth+1e-6) err=`A ${v.dia}″ CMP needs ${(CB()+v.dia/12+CC(v.dia)).toFixed(2)} ft of depth with ${Math.round(CB()*12)}″ bedding and ${Math.round(CC(v.dia)*12)}″ cover. Choose a smaller diameter, reduce cover, or add depth.`;
   else if(v._sp.some(x=>x!=null&&(!isFinite(x)||x<0||x>120))) err='Spacing and side excavation must be between 0 and 120 inches.';
   else if(!isFinite(+inputs.ow.value)||+inputs.ow.value<0||+inputs.ow.value>20) err='Overdig width must be between 0 and 20 ft per side.';
@@ -3233,7 +3290,7 @@ function preview(){
   const {ch,cm}=pvCache[key];
   if(!ch||!cm){ $('err').textContent=`${!ch?v.model:'The Contech CMP'} does not fit in this footprint. Make the shape larger or its legs wider.`; $('start').disabled=$('startInstant').disabled=true; return; }
   { const bCh=v.mode==='footprint'?ch.storage:v.req, bCm=v.mode==='footprint'?cm.storage:v.req;
-    $('hchMat').textContent=v.chPM==='total'?`≈ $${(v.chTot/ch.storage).toFixed(2)} per cf of installed storage (${Math.round(ch.storage).toLocaleString()} cf)`:`≈ ${fmt$(bCh*v.ch)} for ${Math.round(bCh).toLocaleString()} cf`;
+    $('hchMat').textContent=v.chPM==='total'?`≈ $${(v.chTot/ch.storage).toFixed(2)} per cf of installed storage (${Math.round(ch.storage).toLocaleString()} cf)`:`≈ ${fmt$(bCh*v.ch)} for ${Math.round(bCh).toLocaleString()} cf${isCIP(v.model)?` · ≈ $${Math.round(v.ch*Math.PI*(cipD(v.model)/24)**2)}/lf of pipe`:''}`;
     $('hcmpMat').textContent=v.cmpPM==='total'?`≈ $${(v.cmpTot/cm.storage).toFixed(2)} per cf of installed storage (${Math.round(cm.storage).toLocaleString()} cf)`:`≈ ${fmt$(bCm*v.cmp)} for ${Math.round(bCm).toLocaleString()} cf`; }
   if(ch.n>(ch.kind==='box'?40000:12000)){ $('err').textContent=`That needs ${ch.n.toLocaleString()} ${v.model} chambers, too many to animate. Choose a larger chamber or less storage.`; $('start').disabled=$('startInstant').disabled=true; }
   $('pvChT').textContent=v.model+' bed'; $('lblChMat').textContent=v.model;
@@ -3261,9 +3318,9 @@ function preview(){
       if(le<sp.side) w.push(`${v.model} side excavation ${le}″ is below the ${sp.side}″ in the manufacturer detail.`);
       if(cg<cmin) w.push(`CMP barrel spacing ${cg}″ is below Contech's ${cmin}″ minimum for a ${v.dia}″ pipe.`);
       if(ce<12) w.push(`CMP side/end excavation ${ce}″ is below the 12″ in Contech's sample detail.`); }
-    { const noStoneL=isTrap(v.model)||isRT(v.model), noStoneC=v.cmpType==='solid';
+    { const noStoneL=isTrap(v.model)||isRT(v.model)||isCIP(v.model), noStoneC=v.cmpType==='solid';
       inputs.lv.disabled=noStoneL; inputs.cv.disabled=noStoneC;
-      $('hLVoid').textContent=noStoneL?`Not used: ${isTrap(v.model)?'StormTrap':rtFam(v.model)} storage counts the module voids only`:`Share of the stone that holds water · ${Math.round((ch.storage-ch.prodVol)).toLocaleString()} cf in stone`;
+      $('hLVoid').textContent=noStoneL?(isCIP(v.model)?'Not used: cast-in-place pipe has no stone envelope, so storage is the pipe only':`Not used: ${isTrap(v.model)?'StormTrap':rtFam(v.model)} storage counts the module voids only`):`Share of the stone that holds water · ${Math.round((ch.storage-ch.prodVol)).toLocaleString()} cf in stone`;
       $('hCVoid').textContent=noStoneC?'Not used: solid pipe counts the pipe volume only':`Share of the stone that holds water · ${Math.round((cm.storage-cm.prodVol)).toLocaleString()} cf in stone`;
       if(!noStoneL&&(v.lv<0.3||v.lv>0.45)) w.push(`${v.model} stone voids of ${Math.round(v.lv*100)}% are outside the usual 30–45% for clean crushed stone.`);
       if(!noStoneC&&(v.cv<0.3||v.cv>0.45)) w.push(`CMP stone voids of ${Math.round(v.cv*100)}% are outside the usual 30–45% for clean crushed stone.`); }
@@ -3275,7 +3332,7 @@ function preview(){
   $('fldGeo').hidden=!isCrate(v.model);
   if(isCrate(v.model)) $('hGeo').textContent=`Wraps top, bottom and all 4 sides of the module block: ${Math.round(ch.geoSF).toLocaleString()} sf incl. 10% laps ≈ ${fmt$(ch.geoSF*(isFinite(v.geo)?v.geo:0))}`;
   if(isRT(v.model)) $('rtHint').textContent=`using ${ch.cfgName} · ${ch.hIn.toFixed(1)}″`;
-  $('assumeCh').textContent=isRT(v.model)?rtAssume(v.model,ch):isBox(v.model)?aquaAssume(ch):isTrap(v.model)?trapAssume(v.model,ch):chAssume(v.model);
+  $('assumeCh').textContent=isCIP(v.model)?cipAssume(v.model,ch):isRT(v.model)?rtAssume(v.model,ch):isBox(v.model)?aquaAssume(ch):isTrap(v.model)?trapAssume(v.model,ch):chAssume(v.model);
   $('fldLayers').hidden=!isBox(v.model);
   if(isBox(v.model)) $('layersHint').textContent=`using ${ch.layers}`;
   $('fldTrapH').hidden=!isTrap(v.model);
@@ -3297,7 +3354,8 @@ inputs.model.innerHTML='<optgroup label="ADS StormTech chambers">'+Object.entrie
   +'<optgroup label="ADS AquaBox modules"><option value="AquaBox">ADS AquaBox · 29.5″ × 29.5″ modules · 0.5 to 3 layers</option></optgroup>'
   +'<optgroup label="R-Tank modules (ACF Environmental)">'+Object.entries(RTANK).filter(([k,t])=>!t.mv).map(([k,t])=>`<option value="${k}">${k} · ${t.pw}″ × ${t.pl}″ · ${t.h0}″ to ${rtH(k,t.nMax).toFixed(1)}″ tall · ${Math.round(t.void*100)}% void</option>`).join('')+'</optgroup>'
   +'<optgroup label="Greenrise MODvault modules">'+Object.entries(RTANK).filter(([k,t])=>t.mv).map(([k,t])=>`<option value="${k}">${k} · ${t.pw}″ × ${t.pl}″ × ${t.h0}″ · stack 1 to ${t.nMax} layers · ${(t.void*100).toFixed(1).replace(/\.0$/,'')}% void</option>`).join('')+'</optgroup>'
-  +'<optgroup label="StormTrap precast modules">'+Object.entries(TRAPS).map(([k,t])=>`<option value="${k}">StormTrap ${k} · ${fmtFtIn(t.minH)} to ${fmtFtIn(t.maxH)} inside</option>`).join('')+'</optgroup>';
+  +'<optgroup label="StormTrap precast modules">'+Object.entries(TRAPS).map(([k,t])=>`<option value="${k}">StormTrap ${k} · ${fmtFtIn(t.minH)} to ${fmtFtIn(t.maxH)} inside</option>`).join('')+'</optgroup>'
+  +'<optgroup label="Cast-in-place concrete pipe (Blu-Cor · MAG Section 620)">'+CIP_SIZES.map(D=>`<option value="${cipModel(D)}">CIPCP ${D}″ cast in place · ${cipWall(D).toFixed(1)}″ wall · ${(Math.PI*(D/24)**2).toFixed(1)} cf/lf</option>`).join('')+'</optgroup>';
 inputs.model.value=params.model;
 inputs.dia.innerHTML=CMP_DIAS.map(d=>{ const t=`${d}″ (${(d/12).toFixed(1).replace('.0','')} ft) · ${Math.round(Math.PI*(d/24)**2*10)/10} cf/ft`; return `<option value="${d}" data-base="${t}">${t}</option>`; }).join('');
 inputs.dia.value=String(params.dia);
@@ -3504,7 +3562,7 @@ function openSummary(){
     {k:'Accessories & connections',s:(ACCST.use==='det'?'Detention':'Infiltration')+' · budget prices',a:accCost(CH,'ch'),b:accCost(CM,'cmp'),f:fmt$,low:true},
     {k:'Cost per cf stored',s:'Total ÷ installed storage',a:totCh/CH.storage,b:totCm/CM.storage,f:v=>'$'+v.toFixed(2),low:true},
     {k:'Install duration',s:'Crew hours, dig to backfill',a:CH.t4,b:CM.t4,f:v=>v.toFixed(1)+' hr',low:true},
-    {k:'Pieces to set',s:(CH.kind==='trap'?'Precast pieces':CH.rt?'Modules':CH.kind==='box'?'Half modules':'Chambers + end caps')+' vs 20 ft sticks',a:CH.pieces,b:CM.n,f:v=>Math.round(v).toLocaleString(),low:true}
+    {k:CH.kind==='cip'?'Pipe to place':'Pieces to set',s:(CH.kind==='cip'?'Linear ft slip-formed':CH.kind==='trap'?'Precast pieces':CH.rt?'Modules':CH.kind==='box'?'Half modules':'Chambers + end caps')+' vs 20 ft sticks',a:CH.pieces,b:CM.n,f:v=>Math.round(v).toLocaleString(),low:true}
   ];
   let wa=0,wb=0;
   const html=rows.map(r=>{
@@ -3546,7 +3604,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('summary').hidd
 function openVoidImpact(){
   const {v,err}=readInputs();
   if(err){ $('err').textContent=err; return; }
-  const usesL=!(isTrap(v.model)||isRT(v.model)), usesC=v.cmpType!=='solid';
+  const usesL=!(isTrap(v.model)||isRT(v.model)||isCIP(v.model)), usesC=v.cmpType!=='solid';
   const scale=document.querySelector('input[name=viMat]:checked').value==='qty';
   const ref=layouts(v);                    // your current inputs
   const top=Math.min(60,Math.max(40,Math.round(v.lv*100),Math.round(v.cv*100)));
@@ -3561,7 +3619,7 @@ function openVoidImpact(){
   const totOf=(S,side,R)=>S.exc*v.exc/27+S.stone*v.stone/27+matOf(S,side,R)+(S.crate?S.geoSF*v.geo:0)+accCost(S,side);
   const qtyOf=S=>S.kind==='chamber'?S.n:S.kind==='box'?(S.rt?S.pieces:S.cells*S.layers):S.kind==='trap'?S.n:S.n;
   const unit=S=>S.kind==='chamber'?'chambers':S.kind==='box'?(S.rt?'modules':'stacks'):S.kind==='trap'?'modules':'sticks';
-  const lay=S=>S.kind==='chamber'?`${gridTxt(S)} rows · ${S.n.toLocaleString()} chambers`:S.kind==='box'?(S.rt?(S.mv?`${S.cells.toLocaleString()} columns × ${S.cfgName} · ${gridTxt(S)}`:`${S.cells.toLocaleString()} modules · ${gridTxt(S)}`):`${S.cells.toLocaleString()} cells × ${S.layers} layers`):S.kind==='trap'?`${S.n} modules · ${gridTxt(S)}`:`${S.shaped?S.nRuns+' runs':S.B+' barrels × '+S.S} · ${S.n} sticks`;
+  const lay=S=>S.kind==='cip'?`${S.n.toLocaleString()} lf in ${S.nRuns} runs`:S.kind==='chamber'?`${gridTxt(S)} rows · ${S.n.toLocaleString()} chambers`:S.kind==='box'?(S.rt?(S.mv?`${S.cells.toLocaleString()} columns × ${S.cfgName} · ${gridTxt(S)}`:`${S.cells.toLocaleString()} modules · ${gridTxt(S)}`):`${S.cells.toLocaleString()} cells × ${S.layers} layers`):S.kind==='trap'?`${S.n} modules · ${gridTxt(S)}`:`${S.shaped?S.nRuns+' runs':S.B+' barrels × '+S.S} · ${S.n} sticks`;
   const refTot={ch:totOf(ref.CH,'ch',ref.CH),cm:totOf(ref.CM,'cmp',ref.CM)};
   const delta=(S,R,t,t0)=>{ const dq=Math.round(qtyOf(S)-qtyOf(R)), dt=t-t0;
     const cls=Math.abs(dt)<1&&dq===0?'eq':dt>0?'up':'dn';
@@ -3603,7 +3661,7 @@ function frame(){
     const t=simT, st=W.update(t,now,playing);
     if(running){
       const CH=W.CH, CM=W.CM;
-      const tc=ledger('ch',CH,t,params.ch,st.ch,CH.kind==='trap'?'Crane-setting modules':CH.kind==='box'?'Assembling modules':'Hand-setting chambers');
+      const tc=ledger('ch',CH,t,params.ch,st.ch,CH.kind==='cip'?'Slip-forming pipe':CH.kind==='trap'?'Crane-setting modules':CH.kind==='box'?'Assembling modules':'Hand-setting chambers');
       const tm=ledger('cmp',CM,t,params.cmp,st.cm,'Crane-setting pipe');
       setTrack('track-ch',CH,t); setTrack('track-cmp',CM,t);
       const b=$('banner');
