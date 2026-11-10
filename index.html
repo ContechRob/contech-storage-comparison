@@ -439,6 +439,45 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
 .pl-div{stroke:rgba(0,0,0,.35);stroke-width:.6px;vector-effect:non-scaling-stroke;fill:none}
 .pl-ol{stroke:var(--fg);stroke-width:1.5px;vector-effect:non-scaling-stroke;fill:none;stroke-dasharray:5 3}
 @media (max-width:700px){ .shp-body{grid-template-columns:1fr} }
+/* cast-in-place cure before traffic */
+.cipnote{display:flex;flex-direction:column;gap:1px;margin-top:10px;padding:8px 10px;border-radius:12px;background:color-mix(in srgb,var(--ch) 16%,transparent);border:1px solid color-mix(in srgb,var(--ch) 45%,transparent);color:var(--fg);line-height:1.3}
+.cipnote .lbl{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cipnote .big{font-size:17px;font-weight:800;color:var(--ch-ink,var(--fg))}
+.cipnote .brk{font-size:11.5px}
+.cipnote .rng{font-size:10.5px;color:var(--muted)}
+.cipsum{margin-top:16px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,var(--ch) 12%,transparent);border:1px solid color-mix(in srgb,var(--ch) 40%,transparent)}
+.cipsum h3{font-size:14px;margin:0 0 8px}
+.cipsum h3 span{font-weight:500;color:var(--muted);font-size:12px;margin-left:6px}
+.cipgrid{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start}
+.cipbig b{display:block;font-size:28px;font-weight:800;line-height:1.05;color:var(--ch-ink,var(--fg));white-space:nowrap}
+.cipbig small{color:var(--muted);font-size:11.5px}
+.cipsum ol{margin:0;padding-left:18px;font-size:12.5px;display:grid;gap:4px}
+.cipsum .hint2{margin:8px 0 0}
+@media (max-width:560px){ .cipgrid{grid-template-columns:1fr} }
+/* ---- input screen: three clear steps ---- */
+.step{display:flex;flex-direction:column;gap:12px;min-width:0}
+.stephd{display:flex;align-items:center;gap:10px;margin:6px 0 0;padding-bottom:8px;border-bottom:1px solid var(--line);font-family:var(--cond,inherit);font-size:15px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--brand,var(--cmp))}
+.stephd i{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--brand,var(--cmp));color:#fff;font-style:normal;font-size:13px;letter-spacing:0}
+.stephd span{margin-left:auto;font-family:var(--body,inherit);font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted);text-align:right}
+.step>.fields{margin:0}
+.qrow{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.userow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.userow .hint2{margin:0}
+.lblsub{margin-left:4px;font-weight:500;color:var(--muted)}
+.qrow .fld label{font-size:12px;letter-spacing:0}
+.userow .qolbl{font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+.panel{display:flex;flex-direction:column;gap:12px}
+.panel>.fld{margin:0}
+.startbtns #startInstant{background:transparent;color:var(--brand,var(--cmp));border:1.5px solid var(--brand,var(--cmp));box-shadow:none}
+.startbtns #startInstant:hover{background:color-mix(in srgb,var(--brand,var(--cmp)) 9%,transparent)}
+@media (max-width:560px){
+  .stephd span{display:none}
+  .mode{grid-template-columns:1fr}
+  .mode label{flex-direction:row;align-items:baseline;justify-content:space-between;gap:10px}
+  .actions{flex-direction:column-reverse;align-items:stretch}
+  .startbtns{flex-direction:column-reverse;width:100%}
+  .startbtns button{width:100%}
+}
 </style>
 
 
@@ -451,7 +490,9 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
       <h1 id="setupTitle">Stormwater Storage Comparison</h1>
       <span class="h1rule" aria-hidden="true"></span>
     </div>
-    <p class="lede">Pick a comparable product (ADS StormTech, AquaBox, R-Tank, Greenrise MODvault or StormTrap) and race it against a crane-set Contech CMP crew. Size both beds to a storage target or fit both into the same footprint, enter your unit prices, and watch quantities and costs build live.</p>
+    <p class="lede">Set up the project, choose a comparable product, then compare footprint, excavation and installed cost side by side with Contech CMP.</p>
+    <section class="step" aria-labelledby="st1">
+    <h2 class="stephd" id="st1"><i>1</i>Project<span>Applies to both products</span></h2>
     <div class="fields">
       <div class="fld wide">
         <label id="modeLbl">Design for</label>
@@ -489,40 +530,37 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
         </div>
         <small class="hint2">Both products are fitted inside this footprint with their own spacing and side excavation, turned whichever way stores more.</small>
       </div>
-      <div class="qwrap" role="group" aria-labelledby="qhead">
-        <div class="qhead" id="qhead">Site &amp; earthwork <span>applies to both products</span></div>
+      <div class="qwrap" role="group" aria-label="Site and earthwork">
         <div class="qrow">
           <div class="fld" id="fldReq">
-            <label for="inReq">Storage req'd</label>
+            <label for="inReq">Storage required</label>
             <div class="inwrap"><input id="inReq" type="number" inputmode="numeric" min="5000" max="500000" step="1000" value="100000"><span>cf</span></div>
           </div>
           <div class="fld" id="fldL" hidden>
-            <label for="inL">Footprint L</label>
+            <label for="inL">Footprint length</label>
             <div class="inwrap"><input id="inL" type="number" inputmode="decimal" min="30" max="600" step="5" value="250"><span>ft</span></div>
           </div>
           <div class="fld" id="fldW" hidden>
-            <label for="inW">Footprint W</label>
+            <label for="inW">Footprint width</label>
             <div class="inwrap"><input id="inW" type="number" inputmode="decimal" min="30" max="600" step="5" value="100"><span>ft</span></div>
           </div>
           <div class="fld">
-            <label for="inDepth" title="Available depth below grade">Depth avail.</label>
+            <label for="inDepth" title="Available depth below grade">Available depth</label>
             <div class="inwrap"><input id="inDepth" type="number" inputmode="decimal" min="2" max="30" step="0.5" value="9"><span>ft</span></div>
           </div>
           <div class="fld">
-            <label for="inExc" title="Excavation cost, both products">Excavation</label>
+            <label for="inExc" title="Excavation cost, both products">Excavation cost</label>
             <div class="inwrap"><span>$</span><input id="inExc" type="number" inputmode="decimal" min="0" step="0.25" value="20.25"><span>/cy</span></div>
           </div>
           <div class="fld">
-            <label for="inStone" title="Stone cost, both products">Stone</label>
+            <label for="inStone" title="Stone cost, both products">Stone cost</label>
             <div class="inwrap"><span>$</span><input id="inStone" type="number" inputmode="decimal" min="0" step="1" value="30"><span>/cy</span></div>
           </div>
         </div>
-        <div class="qopts">
+        <div class="userow">
           <span class="qolbl" id="useLbl">System use</span>
           <div class="pmseg useseg" role="radiogroup" aria-labelledby="useLbl"><label><input type="radio" name="accUse" value="inf" checked>Infiltration</label><label><input type="radio" name="accUse" value="det">Detention</label></div>
-          <span class="qolbl">Common items</span>
-          <label class="qchk" title="Adds an outlet control to both products: concrete structure for the comparable product, internal weir plate for Contech CMP"><input type="checkbox" id="inAccOut">Outlet control</label>
-          <label class="qchk" title="Adds a pretreatment unit to both products (StormTech uses its Isolator Row instead)"><input type="checkbox" id="inAccPre">Pretreatment unit</label>
+          <small class="hint2">Detention makes liners available under Accessories.</small>
         </div>
       </div>
       <button type="button" class="more more-tight" aria-expanded="false" aria-controls="advOd"><span class="chev" aria-hidden="true">›</span><span>Overdig options</span><small id="moreOdLbl"></small></button>
@@ -544,6 +582,9 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
         </div>
       </div>
     </div>
+    </section>
+    <section class="step" aria-labelledby="st2">
+    <h2 class="stephd" id="st2"><i>2</i>Products<span>Defaults follow each manufacturer's published specs</span></h2>
     <div class="duo">
       <section class="panel" style="--side:var(--ch);--side-ink:var(--ch-ink)" aria-labelledby="pnlCh">
         <h2 id="pnlCh"><span class="swatch"></span>Comparable product</h2>
@@ -566,6 +607,28 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
           <div class="inwrap"><input id="inTrapH" type="number" inputmode="decimal" min="1.08" max="15" step="0.25" placeholder="Tallest that fits"><span>ft</span></div>
           <small class="hint2" id="trapHhint"></small>
         </div>
+        <div class="fld wide">
+          <label id="lblchPM">Material price<span class="lblsub" id="lblChMat">MC-7200</span></label>
+          <div class="pmseg" role="radiogroup" aria-labelledby="lblchPM">
+            <label><input type="radio" name="chPM" value="cf" checked>Per cf of storage</label>
+            <label><input type="radio" name="chPM" value="total">Total known price</label>
+          </div>
+          <div class="inwrap" id="wrapchCf"><span>$</span><input id="inCh" type="number" inputmode="decimal" min="0" step="0.25" value="7.00" aria-label="Material price per cf of storage"><span>/cf</span></div>
+          <div class="inwrap" id="wrapchTot" hidden><span>$</span><input id="inChTot" type="number" inputmode="decimal" min="0" step="1000" aria-label="Total known material price"><span>total</span></div>
+          <small class="hint2" id="hchMat"></small>
+        </div>
+        <div class="fld wide" id="fldGeo" hidden>
+          <label for="inGeo">Geotextile wrap · Class 2 non-woven</label>
+          <div class="inwrap"><span>$</span><input id="inGeo" type="number" inputmode="decimal" min="0" step="0.01" value="0.30"><span>/sf</span></div>
+          <small class="hint2" id="hGeo"></small>
+        </div>
+        <div class="fld wide">
+          <div class="lblrow"><label for="inLVoid">Backfill stone void storage</label><button type="button" class="vbtn" title="See how the void ratio changes product needed and cost">% Void Impact</button></div>
+          <div class="inwrap"><input id="inLVoid" type="number" inputmode="decimal" min="0" max="60" step="1" value="40"><span>% voids</span></div>
+          <small class="hint2" id="hLVoid"></small>
+        </div>
+        <button type="button" class="more" aria-expanded="false" aria-controls="advBcL"><span class="chev" aria-hidden="true">›</span><span>Bedding &amp; cover</span><small id="bcLblL"></small></button>
+        <div class="adv" id="advBcL" hidden>
         <div class="fld">
           <label for="inLBed">Bedding</label>
           <div class="inwrap"><input id="inLBed" type="number" inputmode="decimal" min="0" max="60" step="1"><span>in</span></div>
@@ -576,10 +639,6 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
           <div class="inwrap"><input id="inLCov" type="number" inputmode="decimal" min="0" max="240" step="1"><span>in</span></div>
           <small class="hint2" id="hLCov"></small>
         </div>
-        <div class="fld wide">
-          <div class="lblrow"><label for="inLVoid">Backfill stone void storage</label><button type="button" class="vbtn" title="See how the void ratio changes product needed and cost">% Void Impact</button></div>
-          <div class="inwrap"><input id="inLVoid" type="number" inputmode="decimal" min="0" max="60" step="1" value="40"><span>% voids</span></div>
-          <small class="hint2" id="hLVoid"></small>
         </div>
         <button type="button" class="more" aria-expanded="false" aria-controls="advCh"><span class="chev" aria-hidden="true">›</span><span>Spacing &amp; side excavation</span><small id="moreChLbl"></small></button>
         <div class="adv" id="advCh" hidden>
@@ -593,21 +652,6 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
             <div class="inwrap"><input id="inLSide" type="number" inputmode="decimal" min="0" max="120" step="1"><span>in</span></div>
             <small class="hint2" id="hLSide"></small>
           </div>
-        </div>
-        <div class="fld wide" id="fldGeo" hidden>
-          <label for="inGeo">Geotextile wrap · Class 2 non-woven</label>
-          <div class="inwrap"><span>$</span><input id="inGeo" type="number" inputmode="decimal" min="0" step="0.01" value="0.30"><span>/sf</span></div>
-          <small class="hint2" id="hGeo"></small>
-        </div>
-        <div class="fld wide">
-          <label id="lblchPM"><span id="lblChMat">MC-7200</span> material price</label>
-          <div class="pmseg" role="radiogroup" aria-labelledby="lblchPM">
-            <label><input type="radio" name="chPM" value="cf" checked>Per cf of storage</label>
-            <label><input type="radio" name="chPM" value="total">Total known price</label>
-          </div>
-          <div class="inwrap" id="wrapchCf"><span>$</span><input id="inCh" type="number" inputmode="decimal" min="0" step="0.25" value="7.00" aria-label="Material price per cf of storage"><span>/cf</span></div>
-          <div class="inwrap" id="wrapchTot" hidden><span>$</span><input id="inChTot" type="number" inputmode="decimal" min="0" step="1000" aria-label="Total known material price"><span>total</span></div>
-          <small class="hint2" id="hchMat"></small>
         </div>
         <button type="button" class="more" aria-expanded="false" aria-controls="advAccL"><span class="chev" aria-hidden="true">›</span><span>Accessories &amp; connections</span><small id="accLblL"></small></button>
         <div class="adv accwrap" id="advAccL" hidden>
@@ -626,6 +670,23 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
           <label for="inCType">Pipe wall</label>
           <div class="inwrap"><select id="inCType"><option value="perforated">Perforated · stone voids count as storage</option><option value="xfiltration">Xfiltration joint · stone voids count as storage</option><option value="solid">Solid · pipe volume only</option></select></div>
         </div>
+        <div class="fld wide">
+          <label id="lblcmpPM">Material price<span class="lblsub" id="lblCmMat">96″ CMP</span></label>
+          <div class="pmseg" role="radiogroup" aria-labelledby="lblcmpPM">
+            <label><input type="radio" name="cmpPM" value="cf" checked>Per cf of storage</label>
+            <label><input type="radio" name="cmpPM" value="total">Total known price</label>
+          </div>
+          <div class="inwrap" id="wrapcmpCf"><span>$</span><input id="inCmp" type="number" inputmode="decimal" min="0" step="0.25" value="8.00" aria-label="Material price per cf of storage"><span>/cf</span></div>
+          <div class="inwrap" id="wrapcmpTot" hidden><span>$</span><input id="inCmpTot" type="number" inputmode="decimal" min="0" step="1000" aria-label="Total known material price"><span>total</span></div>
+          <small class="hint2" id="hcmpMat"></small>
+        </div>
+        <div class="fld wide">
+          <div class="lblrow"><label for="inCVoid">Backfill stone void storage</label><button type="button" class="vbtn" title="See how the void ratio changes product needed and cost">% Void Impact</button></div>
+          <div class="inwrap"><input id="inCVoid" type="number" inputmode="decimal" min="0" max="60" step="1" value="40"><span>% voids</span></div>
+          <small class="hint2" id="hCVoid"></small>
+        </div>
+        <button type="button" class="more" aria-expanded="false" aria-controls="advBcC"><span class="chev" aria-hidden="true">›</span><span>Bedding &amp; cover</span><small id="bcLblC"></small></button>
+        <div class="adv" id="advBcC" hidden>
         <div class="fld">
           <label for="inCBed">Bedding</label>
           <div class="inwrap"><input id="inCBed" type="number" inputmode="decimal" min="0" max="60" step="1"><span>in</span></div>
@@ -636,10 +697,6 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
           <div class="inwrap"><input id="inCCov" type="number" inputmode="decimal" min="0" max="240" step="1"><span>in</span></div>
           <small class="hint2" id="hCCov"></small>
         </div>
-        <div class="fld wide">
-          <div class="lblrow"><label for="inCVoid">Backfill stone void storage</label><button type="button" class="vbtn" title="See how the void ratio changes product needed and cost">% Void Impact</button></div>
-          <div class="inwrap"><input id="inCVoid" type="number" inputmode="decimal" min="0" max="60" step="1" value="40"><span>% voids</span></div>
-          <small class="hint2" id="hCVoid"></small>
         </div>
         <button type="button" class="more" aria-expanded="false" aria-controls="advCm"><span class="chev" aria-hidden="true">›</span><span>Spacing &amp; side excavation</span><small id="moreCmLbl"></small></button>
         <div class="adv" id="advCm" hidden>
@@ -654,22 +711,15 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
             <small class="hint2" id="hCSide"></small>
           </div>
         </div>
-        <div class="fld wide">
-          <label id="lblcmpPM"><span id="lblCmMat">96″ CMP</span> material price</label>
-          <div class="pmseg" role="radiogroup" aria-labelledby="lblcmpPM">
-            <label><input type="radio" name="cmpPM" value="cf" checked>Per cf of storage</label>
-            <label><input type="radio" name="cmpPM" value="total">Total known price</label>
-          </div>
-          <div class="inwrap" id="wrapcmpCf"><span>$</span><input id="inCmp" type="number" inputmode="decimal" min="0" step="0.25" value="8.00" aria-label="Material price per cf of storage"><span>/cf</span></div>
-          <div class="inwrap" id="wrapcmpTot" hidden><span>$</span><input id="inCmpTot" type="number" inputmode="decimal" min="0" step="1000" aria-label="Total known material price"><span>total</span></div>
-          <small class="hint2" id="hcmpMat"></small>
-        </div>
         <button type="button" class="more" aria-expanded="false" aria-controls="advAccC"><span class="chev" aria-hidden="true">›</span><span>Accessories &amp; connections</span><small id="accLblC"></small></button>
         <div class="adv accwrap" id="advAccC" hidden>
           <div class="acclist" id="accListC"></div>
         </div>
       </section>
     </div>
+    </section>
+    <section class="step" aria-labelledby="st3">
+    <h2 class="stephd" id="st3"><i>3</i>Review &amp; compare</h2>
     <div class="preview">
       <div class="pv" style="--side:var(--ch);--side-ink:var(--ch-ink)"><b id="pvChT">MC-7200 bed</b><span class="big" id="pvCh"></span><span id="pvCh2"></span></div>
       <div class="pv" style="--side:var(--cmp)"><b id="pvCmT">96″ CMP bed</b><span class="big" id="pvCm"></span><span id="pvCm2"></span></div>
@@ -682,10 +732,11 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
         <ul id="assume"></ul>
       </details>
       <div class="startbtns">
-        <button type="submit" id="startInstant" title="Skip the animation and open the finished comparison">Instant summary comparison</button>
+        <button type="submit" id="startInstant" title="Skip the animation and open the finished comparison">Instant summary</button>
         <button type="submit" id="start" title="Watch both crews build the beds">Start animated comparison</button>
       </div>
     </div>
+    </section>
   </form>
 </div>
 
@@ -699,6 +750,7 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
     <div class="score" id="sumScore"></div>
     <p class="verdict" id="sumVerdict"></p>
     <div class="sumrows" id="sumRows"></div>
+    <div class="cipsum" id="sumCip" hidden></div>
     <div class="sumacc" id="sumAcc"></div>
     <div class="legend2"><span>✓ marks the advantage on each line</span><span>Bar length shows each product's share of the larger value</span><span>Within 1% counts as even</span></div>
   </div>
@@ -767,6 +819,7 @@ table.an.vi tr.cur td{background:color-mix(in srgb,var(--fg) 6%,transparent)}
       </dl>
       <div class="total"><span>Project total</span><b id="tot-ch">$0</b></div>
       <div class="percf"><span>Overall price per cf of storage</span><b id="pcf-ch">$0.00/cf</b></div>
+      <div class="cipnote" id="cipNote" hidden></div>
     </section>
 
     <section class="card" id="card-cmp" style="--side:var(--cmp)">
@@ -2191,8 +2244,16 @@ function fitCIP(L,W,model){ const D=cipD(model), OD=cipOD(D), s=LG(model), sp=fa
   for(const [a,b] of [[W,L],[L,W]]){ const B=Math.floor((a+s)/(OD+s)+1e-9), run=Math.min(Math.floor(b),CIP_MAXRUN); if(B<1||run<1) continue;
     const bed=shapeBed('cip',{model},{},sp,cipRunsRect(B,run,model),[[0,0,a,b]],0); if(!best||bed.storage>best.storage) best=bed; }
   return best; }
+// Projected days before traffic can cross a cast-in-place system: the last section must be cast, reach the 3,000 psi
+// Mesa 620 requires before final backfill and compaction, then be backfilled to grade. MAG Class A is a 3,000 psi mix,
+// so 7 days is a typical time to reach it (Mesa also requires 7 days of humid curing); 3 days with a high-early mix, 28 days at worst.
+const CIP_DAY=325, CIP_CURE_TYP=7, CIP_CURE_FAST=3, CIP_CURE_SLOW=28;
+function cipTraffic(S){
+  const cast=Math.max(1,Math.ceil(S.lf/CIP_DAY)), bf=Math.max(1,Math.ceil(((S.backfill||0)+(S.digArea||0)*S.cov)/RATE.stone/8));
+  return {cast,bf,typ:cast+CIP_CURE_TYP+bf,fast:cast+CIP_CURE_FAST+bf,slow:cast+CIP_CURE_SLOW+bf};
+}
 function cipAssume(k,b){ const D=cipD(k), t=cipWall(D), OD=cipOD(D);
-  return `Cast-in-place ${D}″ pipe: ${t.toFixed(1)}″ wall (ID/12 + 1″, MAG/Mesa Section 620), ${(OD*12).toFixed(1)}″ OD, ${(Math.PI*(D/24)**2).toFixed(1)} cf per lf. Slip-formed against a vertical-sided trench with a semicircular bottom, so there is no stone, no bedding and no side excavation; storage is the pipe only. Excavation is the trenches alone (the soil between parallel runs stays). Assumed: ${Math.round(LC(k)*12)}″ cover (not set by Section 620; confirm per plans), ${Math.round(LG(k)*12)}″ of undisturbed soil between trenches, ${Math.round(CIP_RATE*8)} lf per day per slipform spread, ${CIP_CURE} h to the 3,000 psi Mesa 620 requires before final backfill (TRB field data: backfill usually starts after 2–3 days), runs no longer than ${CIP_MAXRUN.toLocaleString()} ft (practical limit; Section 620 sets none). Confirm against the MAG detail sheets and the contractor's layout.`; }
+  return `Cast-in-place ${D}″ pipe: ${t.toFixed(1)}″ wall (ID/12 + 1″, MAG/Mesa Section 620), ${(OD*12).toFixed(1)}″ OD, ${(Math.PI*(D/24)**2).toFixed(1)} cf per lf. Slip-formed against a vertical-sided trench with a semicircular bottom, so there is no stone, no bedding and no side excavation; storage is the pipe only. Excavation is the trenches alone (the soil between parallel runs stays). Assumed: ${Math.round(LC(k)*12)}″ cover (not set by Section 620; confirm per plans), ${Math.round(LG(k)*12)}″ of undisturbed soil between trenches, ${Math.round(CIP_RATE*8)} lf per day per slipform spread, ${CIP_CURE} h to the 3,000 psi Mesa 620 requires before final backfill (TRB field data: backfill usually starts after 2–3 days), runs no longer than ${CIP_MAXRUN.toLocaleString()} ft (practical limit; Section 620 sets none). The cure-before-traffic note uses a typical ${CIP_CURE_TYP} days to 3,000 psi (range ${CIP_CURE_FAST} to ${CIP_CURE_SLOW}); the animation shows the ${CIP_CURE} h best case. Confirm against the MAG detail sheets and the contractor's layout.`; }
 function leftLayout(p){
   if(isCIP(p.model)) return p.mode==='footprint'?(p.shape?fitShape('cip',p,{}):fitCIP(p.fpL,p.fpW,p.model)):layoutCIP(p.req,p.model);
   if(p.mode==='footprint'&&p.shape) return isRT(p.model)?fitShape('rt',p,{n:p.rtN||rtAutoN(p.model,p.depth)||1}):isBox(p.model)?fitShape('aqua',p,{N:p.layers||aquaAutoLayers(p.depth)}):isTrap(p.model)?fitShape('trap',p,{H:p.trapH||trapAutoH(p.model,p.depth)}):fitShape('chamber',p,{});
@@ -2441,11 +2502,11 @@ const ACCST={use:'inf',iso:1,outlet:false,pre:false,ch:{},cmp:{}};
 function accRows(S,side){
   if(!S) return [];
   const fam=famOf(S), c={iso:Math.max(0,ACCST.iso|0),det:ACCST.use==='det'}, st=ACCST[side]||{};
-  const list=(ACC[fam]||[]).concat(ACC_COMMON.filter(x=>x.fams.includes(fam)&&ACCST[x.common]));
+  const list=(ACC[fam]||[]).concat(ACC_COMMON.filter(x=>x.fams.includes(fam)));
   return list.filter(it=>(!it.det||c.det)&&(!it.inf||!c.det)&&(!it.perf||S.wall!=='solid')&&(!it.iso||c.iso>0)).map(it=>{
     const o=st[it.id]||{}, auto=Math.max(0,it.qty(S,c)||0), qty=o.qty!=null?o.qty:auto;
     const price0=typeof it.price==='function'?it.price(S):it.price, price=o.price!=null?o.price:price0;
-    const on=o.on!=null?o.on:!(it.sys||it.off);
+    const on=o.on!=null?o.on:false;
     return {it,auto,qty,price,price0,on,cost:on?qty*price:0};
   });
 }
@@ -3219,6 +3280,8 @@ function setLabels(){
   $('chName').textContent=[CH.brand,CH.model].filter(Boolean).join(' ')+(CH.kind==='cip'?' cast in place':CH.kind==='trap'?' '+fmtFtIn(CH.trapH):CH.rt?' · '+CH.cfgName:CH.kind==='box'?' · '+CH.layers+' layer'+(CH.layers===1?'':'s'):'');
   document.querySelector('[data-cam="ch"]').textContent=CH.kind==='trap'?'StormTrap':CH.rt?(CH.mv?'MODvault':'R-Tank'):CH.kind==='box'?'AquaBox':'Chambers';
   $('chEyebrow').textContent=CH.kind==='cip'?'Left crew · slip-formed in place':CH.kind==='trap'?'Left crew · set by crane':'Left crew · set by hand';
+  { const el=$('cipNote'); if(el){ el.hidden=CH.kind!=='cip'; if(CH.kind==='cip'){ const t=cipTraffic(CH);
+    el.innerHTML=`<span class="lbl">Cure before traffic · projected</span><span class="big">≈ ${t.typ} days</span><span class="brk">${t.cast} d slip-forming ${Math.round(CH.lf).toLocaleString()} lf · ${CIP_CURE_TYP} d to 3,000 psi · ${t.bf} d backfill</span><span class="rng">${t.fast}–${t.slow} days depending on the mix</span>`; } } }
   $('stLbl-ch').textContent=CH.kind==='trap'?'New stone (base only)':'New stone backfill';
   $('cmName').textContent='Contech '+CM.dia+'″ CMP · '+CM.wallName;
   $('spec-ch').textContent=CH.kind==='cip'?`${CH.n.toLocaleString()} lf in ${CH.nRuns} run${CH.nRuns>1?'s':''} · ${CH.wallIn.toFixed(1)}″ wall · ${Math.round(CH.bedW)} × ${Math.round(CH.bedL)} ft envelope`:CH.rt?`${CH.mv?CH.cells.toLocaleString()+' columns × '+CH.cfgName+' = '+CH.pieces.toLocaleString()+' modules · '+CH.hIn.toFixed(1)+'″ tall':CH.cells.toLocaleString()+' modules · '+CH.cfgName+' '+CH.hIn.toFixed(1)+'″ tall'} · ${gridTxt(CH)} · bed ${CH.bedW.toFixed(1)} × ${CH.bedL.toFixed(1)} ft = ${Math.round(CH.area).toLocaleString()} sf`:CH.kind==='box'?`${CH.cells.toLocaleString()} cells × ${CH.layers} layers = ${CH.pieces.toLocaleString()} half modules · bed ${CH.bedW.toFixed(1)} × ${CH.bedL.toFixed(1)} ft = ${Math.round(CH.area).toLocaleString()} sf`:CH.kind==='trap'?`${CH.n} modules${CH.pieces>CH.n?` (${CH.pieces} pieces)`:''} · ${gridTxt(CH)} · ${fmtFtIn(CH.trapH)} inside · bed ${CH.bedW.toFixed(1)} × ${CH.bedL.toFixed(1)} ft = ${Math.round(CH.area).toLocaleString()} sf`:`${CH.n} chambers + ${2*(CH.shaped?CH.nRuns:CH.R)} end caps · ${CH.shaped?CH.nRuns+' runs':CH.R+' rows × '+CH.C} · bed ${CH.bedW.toFixed(1)} × ${CH.bedL.toFixed(1)} ft = ${Math.round(CH.area).toLocaleString()} sf`;
@@ -3348,6 +3411,8 @@ function preview(){
   $('pvCh2').textContent=`${ch.mv?ch.pieces.toLocaleString()+' modules ('+ch.cells.toLocaleString()+' columns × '+ch.cfgName+')':ch.n+' '+ch.unit} in ${ch.shaped?ch.nRuns+' runs':ch.R+' rows × '+ch.C} · ${ch.bedW.toFixed(1)} × ${ch.bedL.toFixed(1)} ft · ${Math.round(ch.storage).toLocaleString()} cf installed · ${Math.round(ch.cov*12)}″ cover · dig ${ch.excD.toFixed(2)} ft`;
   $('pvCm2').textContent=`${cm.n} sticks in ${cm.shaped?cm.nRuns+' runs, longest '+cm.runL+' ft':cm.B+' barrel'+(cm.B>1?'s':'')+' × '+cm.runL+' ft'} · ${+cm.bedW.toFixed(1)} × ${+cm.bedL.toFixed(1)} ft · ${Math.round(cm.storage).toLocaleString()} cf installed · ${Math.round(cm.cov*12)}″ cover · dig ${cm.excD.toFixed(2)} ft`;
   renderAcc('ch',ch); renderAcc('cmp',cm);
+  $('bcLblL').textContent=`${$('inLBed').value||0}″ bedding · ${$('inLCov').value||0}″ cover`;
+  $('bcLblC').textContent=`${$('inCBed').value||0}″ bedding · ${$('inCCov').value||0}″ cover`;
   if(v.shape) drawPlans(v,ch,cm);
 }
 inputs.model.innerHTML='<optgroup label="ADS StormTech chambers">'+Object.entries(CHAMBERS).map(([k,m])=>`<option value="${k}">StormTech ${k} · ${m.W}″ W × ${m.H}″ H · ${m.minInst} cf installed each</option>`).join('')+'</optgroup>'
@@ -3383,8 +3448,6 @@ document.querySelectorAll('input[name=shp]').forEach(i=>i.addEventListener('chan
   el.addEventListener('click',e=>{ if(e.target.classList.contains('accreset')){ ACCST[side]={}; preview(); } });
 });
 document.querySelectorAll('input[name=accUse]').forEach(i=>i.addEventListener('change',()=>{ ACCST.use=document.querySelector('input[name=accUse]:checked').value; preview(); }));
-$('inAccOut').addEventListener('change',e=>{ ACCST.outlet=e.target.checked; preview(); });
-$('inAccPre').addEventListener('change',e=>{ ACCST.pre=e.target.checked; preview(); });
 $('inIso').addEventListener('change',e=>{ const x=parseInt(e.target.value,10); ACCST.iso=isFinite(x)&&x>=0?Math.min(x,20):1; e.target.value=ACCST.iso; preview(); });
 
 ['ch','cmp'].forEach(side=>document.querySelectorAll(`input[name=${side}PM]`).forEach(r=>r.addEventListener('change',()=>{
@@ -3431,7 +3494,7 @@ $('assume').innerHTML=[
  'Crate systems (AquaBox, R-Tank, MODvault) add a Class 2 non-woven geotextile wrap on the top, bottom and all four sides of the module block, plus 10% for overlaps. Default $0.30/sf from bulk 8 oz Class 2 non-woven pricing (about $0.24–0.40/sf).',
  'The Contech CMP diameter defaults to the best fit for the available depth: the largest pipe whose bedding + pipe + cover fits, using Contech\'s minimum cover for each size. Changing the depth re-picks it; you can still choose any size.',
  'Spacing and side excavation default to manufacturer details: StormTech rows per ADS (9″ MC-7200/4500/DC-780, 6″ MC-3500/SC-740/SC-310, 0 SC-160LP) with 12″ perimeter stone; AquaBox 12″; R-Tank 2 ft perimeter; MODvault 12″ (assumed); StormTrap 1 ft / 2 ft foundation extension; Contech CMP barrel spacing 12″ to 24″ dia, D/2 to 72″, 36″ above, with 12″ at the sides and ends. Open "Spacing & side excavation" to change them.',
- 'Accessories & connections (in each product panel) follow the manufacturer install guides: ADS StormTech (601T non-woven around the stone, Isolator Row Plus woven fabric, manifolds, inspection ports), ACF R-Tank for the crate systems (liner, 12″ inspection and maintenance ports, pipe boots), StormTrap (joint tape, slab or strip footings, access openings) and Contech CMP (risers, bands, bulkheads, header, trench geotextile, crown membrane). Counts the guides leave to the plans are assumptions, and every unit price is a budget placeholder to replace with a quote. Choose Infiltration or Detention under Site & earthwork: Detention adds liners (none for solid CMP) and the StormTrap slab. Contech bands, bulkheads and header default to included in the CMP $/cf.',
+ 'Accessories & connections (in each product panel) follow the manufacturer install guides: ADS StormTech (601T non-woven around the stone, Isolator Row Plus woven fabric, manifolds, inspection ports), ACF R-Tank for the crate systems (liner, 12″ inspection and maintenance ports, pipe boots), StormTrap (joint tape, slab or strip footings, access openings) and Contech CMP (risers, bands, bulkheads, header, trench geotextile, crown membrane). Counts the guides leave to the plans are assumptions, and every unit price is a budget placeholder to replace with a quote. Every accessory starts unchecked: tick the ones the project needs, including outlet control and pretreatment. System use in step 1 decides which apply: Detention makes liners (none for solid CMP) and the StormTrap slab available. Contech bands, bulkheads and header count as included in the CMP $/cf unless checked.',
  'Custom shape fits each product inside the footprint row by row: every row keeps that product\'s side excavation from the footprint edge, runs are as long as the footprint allows (end caps or bulkheads at each run end), and the bed is the area dug around those runs. Each product is tried both ways round and the way that stores more is used; the 3D view turns the footprint so the rows run front to back. Accessories that depend on the layout (manifolds, bulkheads, bands, risers) are counted per run.',
  'Overdig options add excavation only: extra width per side and sloped walls are backfilled with native soil; undercut below the bedding is replaced with stone. The 3D view shows the bed itself, not the overdig.',
  'Material can be priced per cf of storage or as a total known price for each product. A total price is spread over the build in the animation, and the summary\'s $ per cf divides it by the storage each bed actually holds.',
@@ -3576,6 +3639,12 @@ function openSummary(){
       <div class="v r${bWin?' win':''}">${r.f(r.b)}</div></div>`;
   }).join('');
   $('sumRows').innerHTML=`<div class="sumhead"><span>Measure</span><span class="l">${nCh}</span><span style="text-align:center">Advantage</span><span class="r">${nCm}</span></div>`+html;
+  { const el=$('sumCip'); if(el){ el.hidden=CH.kind!=='cip'; if(CH.kind==='cip'){ const t=cipTraffic(CH);
+    el.innerHTML=`<h3>Cure time before traffic<span>Blu-Cor cast-in-place · projected from this project's size</span></h3><div class="cipgrid"><div class="cipbig"><b>≈ ${t.typ} days</b><small>first pour to traffic</small></div><ol>`
+      +`<li><b>${t.cast} day${t.cast>1?'s':''}</b> slip-forming ${Math.round(CH.lf).toLocaleString()} lf at ${CIP_DAY} lf/day with one spread</li>`
+      +`<li><b>${CIP_CURE_TYP} days</b> for the last pour to reach 3,000 psi. Mesa 620 allows no final backfill or compaction before then and requires 7 days of humid curing</li>`
+      +`<li><b>${t.bf} day${t.bf>1?'s':''}</b> of final backfill and compaction to grade (${Math.round(CH.cov*12)}″ cover)</li></ol></div>`
+      +`<p class="hint2">Range ${t.fast} to ${t.slow} days: 3 days with a high-early mix proven by cylinder breaks, up to 28 days if the Class A mix only reaches 3,000 psi at its 28-day test. Contech CMP has no cure wait: it can take traffic once backfill and minimum cover are in place.</p>`; } } }
   { const list=(S,side)=>{ const r=accRows(S,side).filter(x=>x.on); return r.length?`<table class="acct"><tbody>${r.map(x=>`<tr><td>${x.it.name}</td><td class="num">${Math.round(x.qty).toLocaleString()} ${x.it.unit}</td><td class="num">@ ${x.price<10?'$'+x.price.toFixed(2):fmt$(x.price)}</td><td class="num">${fmt$(x.cost)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="3">Accessories total</td><td class="num">${fmt$(r.reduce((a,x)=>a+x.cost,0))}</td></tr></tfoot></table>`:'<p class="hint2">None priced</p>'; };
     const inSys=accRows(CM,'cmp').filter(x=>x.it.sys&&!x.on).map(x=>x.it.name.toLowerCase());
     $('sumAcc').innerHTML=`<h3>Accessories &amp; connections<span>${ACCST.use==='det'?'Detention':'Infiltration'} · budget unit prices, replace with quotes</span></h3><div class="accg"><div><b class="hd l">${nCh}</b>${list(CH,'ch')}</div><div><b class="hd r">${nCm}</b>${list(CM,'cmp')}${inSys.length?`<p class="hint2">Included in the CMP $/cf (not added): ${inSys.join(', ')}.</p>`:''}</div></div>`; }
